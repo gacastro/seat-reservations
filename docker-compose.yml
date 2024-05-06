@@ -1,0 +1,18 @@
+services:
+  redis:
+    image: redis:latest
+    container_name: seat-reservation-service-redis-container
+    ports:
+      - "6379:6379"
+
+  seat_reservation_service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: seat-reservation-service-container
+    ports:
+      - "3000:3000"
+    environment:
+      - REDIS_PATH=redis
+    depends_on:
+      - redis

@@ -38,14 +38,13 @@ If he is successful, he can hold (or potentially reserve) that seat and the list
 <!-- TOC -->
 
 # Architecture
-Considering the test constraints, we have just used redis to hold our models. And to be honest, taking this to production, redis is fit for the temporary information the service handles, like hold and available seats,
-But we are disregarding the reserved seats precisely because these would need to be stored in disk with a dbms. So for production I would just include a persistence layer. Nosql would be preferred
+Considering the test constraints, we have just used redis to hold our models. And to be honest, taking this to production, redis is fit for the temporary information the service handles, like hold and available seats. But we are disregarding the reserved seats precisely because these would need to be stored in disk with a dbms. So for production I would just include a persistence layer. Nosql would be preferred
 
 We use redis sets to hold
 * The list of available seats
 * The list of seats that are being held
 * The list of seats a particular user is holding
-  * And we have used sets for their atomic/idempotent like operations and the fact they only allow unique values
+  * And we have used sets for their O(1) atomic/idempotent like operations and the fact they only allow unique values
 
 We use redis hashes to hold
 * The event definition
@@ -54,7 +53,7 @@ We use redis hashes to hold
 And finally we use the very famous strings to hold
 * Writing locks: to be used when we wish to write data
 * Held seats. That expire when the user had been holding it for too long
-  * And we have used strings considering the expiration features it offers
+  * And we have used strings considering the expiration features it offers. And of course, its an O(1) operations
 
 ## OpenApi specification
 After successfully completing the steps outlined in the "how to run" section, you should be able to access the service's endpoints specifications by typing `http://localhost:3000/api` into your preferred browser's address bar.

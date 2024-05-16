@@ -14,10 +14,10 @@ All roads lead to rome... an old saying that is very true to IT. Meaning, there 
 The biggest challenge an online booking systems faces is race conditions, due to the high concurrency it can get, specially for those much wanted events.
 If we take it to the extreme, we would need rate limiting, queues, asynchronous communication model, cqrs to scale individually reads from writes and on and on we could go.
 
-For this test however, I focused on developing a service that could prove our idea and is easy to maintain, readable (at least I hope) and ultimately would allow us to fail fast.
+For this test however, I focused on developing a service that could prove our idea and is easy to maintain, readable (at least I hope) and ultimately would allow us to fail fast so we can quickly improve it.
 
 In a nutshell, we keep two lists to tell us which seats are available and which are being held. When a user wants a seat, he needs to acquire a lock.
-If he is successful, he can hold that seat and the lists are updated accordingly. Off course there are more to this but this is the very, very high view of it.
+If he is successful, he can hold (or potentially reserve) that seat and the lists are updated accordingly. Off course there are more to this but this is the very, very high view of it.
 
 <!-- TOC -->
 * [Seat Reservation Service](#seat-reservation-service)
@@ -39,19 +39,22 @@ If he is successful, he can hold that seat and the lists are updated accordingly
 
 # Architecture
 Considering the test constraints, we have just used redis to hold our models. And to be honest, taking this to production, redis is fit for the temporary information the service handles, like hold and available seats,
-But we are disregarding the reserved seats precisely because these would need to be stored in disk with a dbms. So I would just include a persistence layer. Nosql would be preferred
+But we are disregarding the reserved seats precisely because these would need to be stored in disk with a dbms. So for production I would just include a persistence layer. Nosql would be preferred
 
 We use redis sets to hold
 * The list of available seats
 * The list of seats that are being held
 * The list of seats a particular user is holding
+  * And we have used sets for their atomic/idempotent like operations and the fact they only allow unique values
 
 We use redis hashes to hold
 * The event definition
+  * And we have used hashes to simulate a record like structure where you can query with O(1) its properties
 
 And finally we use the very famous strings to hold
 * Writing locks: to be used when we wish to write data
 * Held seats. That expire when the user had been holding it for too long
+  * And we have used strings considering the expiration features it offers
 
 ## OpenApi specification
 After successfully completing the steps outlined in the "how to run" section, you should be able to access the service's endpoints specifications by typing `http://localhost:3000/api` into your preferred browser's address bar.
@@ -72,11 +75,11 @@ However, even a single instance cannot avoid the wrath of race conditions. This 
 One thing to note is that when we found the need to move into a redis cluster, we would need to update the locks to handle distributed environment. Luckily, there are already many libraries for the Redis RedLock, so it should not be as hard as doing it from scratch.
 
 ### Testing
-I did consider setting up a docker environment to test more accurately the integration between the app and redis but that would mean having two different ways of testing. 
+I did consider setting up a docker environment to test more accurately the integration between the app and redis. 
 But I believe this to be slower than just your normal `jest` run because you would need to build a new image of your app every time a feature, or bug, got corrected
 
 ### Time assertions
-Time assertions are always tricky, specially when you run them in different machines or just when processes get paused during their execution. So I preferred to not assert the refresh time on a held seat because you could get a failing test and that is not nice.
+Time assertions are always tricky, specially when you run them in different machines or just when processes get paused during their execution. So for time sake (no pun intended) I preferred to not assert the refresh time on a held seat because you could get a failing test and that is not nice.
 In production, I would either work with a time manipulation library or inject into the app a custom service. The service would give me the current time and then in my tests, I could mock the service and therefore have deterministic tests
 
 ### Uniqueness
@@ -90,8 +93,10 @@ An exception on the other hand, forces you to handle it as it happens, and you c
 
 # How to run
 `npm start`
+
 and when you have had enough fun
-`npm stop`
+
+`npm run stop`
 
 # How to test
 `npm test`
@@ -99,10 +104,10 @@ and when you have had enough fun
 # Improvements
 
 Add an endpoint to close an event. So we could remove entries being held in redis and avoid the dreaded evictions or paying high costs.
-In line with this idea, event without a close event, we would need to manage the lifetime of the entries in redis.
+In line with this concern, even without a close event, we would need to manage the lifetime of the entries in redis.
 
 Review configurations because using the defaults isn't always the best choice. Particularly the redis configuration on retry strategy.
 
-Introduce transactions to keep the state consistent when unexpected errors occur in the midst of any operation. For instance on event creation or when managing a held seat.
+Introduce transactions to keep the state consistent when unexpected errors occur in between steps of any operation. For instance on event creation or when managing a held seat.
 
 The typical measures you would find in a productions environment like api security, load tests, json log formating, and so on.
